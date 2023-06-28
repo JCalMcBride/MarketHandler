@@ -17,7 +17,7 @@ async def main(args):
             price_history_dict, item_info = await MarketAPI.fetch_and_save_statistics(items, item_ids)
         else:
             items, item_ids, item_info = await MarketAPI.fetch_premade_item_data()
-            await MarketAPI.fetch_premade_statistics()
+            await MarketAPI.fetch_premade_statistics(item_ids)
 
     connection = MarketDB.connect_to_database(
         user='market',
