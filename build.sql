@@ -6,6 +6,10 @@ drop table if exists item_subtypes;
 drop table if exists item_mod_ranks;
 drop table if exists items_in_set;
 drop table if exists item_tags;
+drop table if exists item_aliases;
+drop table if exists word_aliases;
+drop table if exists username_history;
+drop table if exists market_users;
 drop table if exists items;
 
 
@@ -46,9 +50,9 @@ CREATE TABLE item_subtypes
 
 CREATE TABLE item_statistics
 (
-    id           VARCHAR(255) PRIMARY KEY,
-    item_id      VARCHAR(255),
+    id           VARCHAR(255),
     datetime     TIMESTAMP,
+    item_id      VARCHAR(255),
     volume       INT,
     min_price    DECIMAL(10, 2),
     max_price    DECIMAL(10, 2),
@@ -62,7 +66,9 @@ CREATE TABLE item_statistics
     closed_price DECIMAL(10, 2)                 DEFAULT NULL,
     mod_rank     INT                            DEFAULT NULL,
     donch_bot    DECIMAL(10, 2)                 DEFAULT NULL,
-    donch_top    DECIMAL(10, 2)                 DEFAULT NULL
+    donch_top    DECIMAL(10, 2)                 DEFAULT NULL,
+    PRIMARY KEY (item_id, datetime),
+    FOREIGN KEY (item_id) REFERENCES items (id)
 );
 
 CREATE TABLE item_aliases (
@@ -91,3 +97,9 @@ CREATE TABLE username_history (
     PRIMARY KEY (user_id, ingame_name),
     FOREIGN KEY (user_id) REFERENCES market_users (user_id)
 );
+
+CREATE INDEX idx_item_statistics_optimized
+ON item_statistics (item_id, datetime, order_type);
+
+CREATE INDEX idx_item_statistics_2
+ON item_statistics (datetime, item_id);
