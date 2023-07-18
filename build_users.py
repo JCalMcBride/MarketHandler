@@ -15,6 +15,7 @@ async def main():
 
     for item in market_db.all_items:
         await market_db.get_item(item['item_name'])
+        market_db.update_usernames()
 
 if __name__ == "__main__":
     asyncio.run(main())
