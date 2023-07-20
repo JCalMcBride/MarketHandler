@@ -10,7 +10,7 @@ instructions [here](https://learn.microsoft.com/en-us/windows/wsl/install) to in
 1. Clone the repository
 
 ```sh
-git clone https://github.com/Jake55111/MarketEngine 
+git clone https://github.com/Jake55111/MarketHandler 
 ```
 
 2. Set up and activate the virtual environment
@@ -35,7 +35,7 @@ pip install -r requirements.txt
 sudo apt install redis
 ```
 
-6. Install and configure MySQL
+6. Install and configure MySQL. It is recommended to change the password to something else than "password". If you do so, you will have to change the password in the config.json file.
 
 ```sh
 sudo apt install mysql-server
@@ -82,11 +82,11 @@ FLUSH PRIVILEGES;
 ```
 
 ```sh
-source build.sql
-```
-
-```sh
 exit
 ```
+
+After this, environment will be set up. If you run main.py with the ```-b``` parameter, it will set up the tables.
+
+If you wish to populate the database with statistic data, run main.py with the ```-f PREMADE -d NEW``` parameters.
 
 

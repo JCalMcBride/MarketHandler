@@ -1,11 +1,13 @@
 import argparse
 import asyncio
+import json
+import os
 
 from market_engine import common
 from market_engine.modules import MarketAPI, MarketDB
 
 
-async def main(args):
+async def main(args, config):
     if args.clear:
         await common.clear_cache()
 
@@ -20,11 +22,19 @@ async def main(args):
             await MarketAPI.fetch_premade_statistics(item_ids)
 
     connection = MarketDB.connect_to_database(
-        user='market',
-        password='38NwWvkvZXiWV3',
-        host='localhost',
-        database='market'
+        user=config['user'],
+        password=config['password'],
+        host=config['host'],
+        database=config['database']
     )
+
+    if args.build:
+        with open("build.sql", "r") as f:
+            sql = f.read()
+
+        for sql in sql.split(";"):
+            if sql.strip() != "":
+                connection.cursor().execute(sql)
 
     if args.database is not None:
         MarketDB.save_items(connection, items, item_ids, item_info)
@@ -52,15 +62,24 @@ def parse_handler():
                         help="Save all price history to the database.\n"
                              "ALL: Save all price history to the database.\n"
                              "NEW: Save only new price history to the database.")
+    parser.add_argument("-b", "--build", action="store_true",
+                        help="Build the database.")
     parser.add_argument("-c", "--clear", action="store_true",
                         help="Clears the cache.")
 
     args = parser.parse_args()
 
+    if os.path.exists("config.json"):
+        with open("config.json", "r") as f:
+            config = json.load(f)
+    else:
+        print("No config file found.")
+        return
+
     if args.log_level:
         common.logger.setLevel(args.log_level)
 
-    asyncio.run(main(args))
+    asyncio.run(main(args, config))
 
 
 if __name__ == "__main__":
