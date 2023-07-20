@@ -8,9 +8,11 @@ from market_engine.modules import MarketAPI, MarketDB
 
 
 async def main(args, config):
+    # Clears cache if specified
     if args.clear:
         await common.clear_cache()
 
+    # Stores data from the API, whether fetched or prefetched from relics.run
     items, item_ids, item_info, manifest_dict = None, None, None, None
     if args.fetch is not None:
         manifest_dict = await MarketAPI.get_manifest()
@@ -21,6 +23,7 @@ async def main(args, config):
             items, item_ids, item_info = await MarketAPI.fetch_premade_item_data()
             await MarketAPI.fetch_premade_statistics(item_ids)
 
+    # Connects to the database
     connection = MarketDB.connect_to_database(
         user=config['user'],
         password=config['password'],
@@ -28,6 +31,7 @@ async def main(args, config):
         database=config['database']
     )
 
+    # Builds the database if specified
     if args.build:
         with open("build.sql", "r") as f:
             sql = f.read()
@@ -36,6 +40,7 @@ async def main(args, config):
             if sql.strip() != "":
                 connection.cursor().execute(sql)
 
+    # Saves data to the database if specified
     if args.database is not None:
         MarketDB.save_items(connection, items, item_ids, item_info)
         MarketDB.save_items_in_set(connection, item_info)
@@ -43,10 +48,12 @@ async def main(args, config):
         MarketDB.save_item_subtypes(connection, item_info)
         MarketDB.build_and_save_category_info(connection, manifest_dict)
 
+        # Set to either the most recent date in the database or set to None if args.database == "ALL"
         last_save_date = MarketDB.get_last_saved_date(connection, args.database)
 
         MarketDB.insert_item_statistics(connection, last_save_date)
 
+        # Commits all changes to the database
         MarketDB.commit_data(connection)
 
 
