@@ -50,7 +50,8 @@ CREATE TABLE item_subtypes
 
 CREATE TABLE item_statistics
 (
-    id           VARCHAR(255),
+    id           VARCHAR(255) PRIMARY KEY,
+    platform     ENUM ('pc', 'ps4', 'xbox', 'switch'),
     datetime     TIMESTAMP,
     item_id      VARCHAR(255),
     volume       INT,
@@ -67,7 +68,6 @@ CREATE TABLE item_statistics
     mod_rank     INT                            DEFAULT NULL,
     donch_bot    DECIMAL(10, 2)                 DEFAULT NULL,
     donch_top    DECIMAL(10, 2)                 DEFAULT NULL,
-    PRIMARY KEY (item_id, datetime),
     FOREIGN KEY (item_id) REFERENCES items (id)
 );
 
@@ -99,10 +99,10 @@ CREATE TABLE username_history (
 );
 
 CREATE INDEX idx_item_statistics_optimized
-ON item_statistics (item_id, datetime, order_type);
+ON item_statistics (item_id, datetime, order_type, platform);
 
 CREATE INDEX idx_item_statistics_2
-ON item_statistics (datetime, item_id);
+ON item_statistics (datetime, item_id, platform);
 
 CREATE INDEX idx_item_order
-ON item_statistics (item_id, order_type);
+ON item_statistics (item_id, order_type, platform);

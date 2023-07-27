@@ -2,5 +2,9 @@
   "user": "market",
   "password": "38NwWvkvZXiWV3",
   "database": "market",
-  "host": "localhost"
+  "host": "localhost",
+  "redis_host": "localhost",
+  "redis_port": 6379,
+  "redis_db": 0,
+  "output_dir": "output"
 }

@@ -3,33 +3,56 @@ import asyncio
 import json
 import os
 
-from market_engine import common
-from market_engine.modules import MarketAPI, MarketDB
+from market_engine import Common, ManifestParser
+from market_engine.API import MarketAPI, RelicsRunAPI
+from market_engine.API.ManifestAPI import get_manifest
+from market_engine.Common import session_manager, cache_manager, logger
+from market_engine.Models.MarketDatabase import MarketDatabase
 
 
 async def main(args, config):
-    # Clears cache if specified
-    if args.clear:
-        await common.clear_cache()
+    async with session_manager() as session, cache_manager() as cache:
+        if args.clear:
+            logger.info("Clearing cache.")
+            cache.flushall()
 
-    # Stores data from the API, whether fetched or prefetched from relics.run
-    items, item_ids, item_info, manifest_dict = None, None, None, None
-    if args.fetch is not None:
-        manifest_dict = await MarketAPI.get_manifest()
-        if args.fetch == "NEW":
-            items, item_ids = await MarketAPI.fetch_and_save_items_and_ids()
-            price_history_dict, item_info = await MarketAPI.fetch_and_save_statistics(items, item_ids)
-        else:
-            items, item_ids, item_info = await MarketAPI.fetch_premade_item_data()
-            await MarketAPI.fetch_premade_statistics(item_ids)
+        # Stores data from the API, whether fetched or prefetched from relics.run
+        items, item_ids, item_info, manifest_dict = None, None, None, None
+        if args.fetch is not None:
+            manifest_dict = await get_manifest(cache=cache, session=session)
+            if args.fetch == "MARKET":
+                items = await MarketAPI.fetch_items_from_warframe_market(cache=cache,
+                                                                         session=session)
+                item_ids = MarketAPI.build_item_ids(items)
+                statistic_history_dict, item_info = \
+                    await MarketAPI.fetch_statistics_from_warframe_market(cache=cache,
+                                                                          session=session,
+                                                                          platform=args.platform,
+                                                                          items=items,
+                                                                          item_ids=item_ids)
+                MarketAPI.save_statistic_history(statistic_history_dict, platform=args.platform)
 
-    # Connects to the database
-    connection = MarketDB.connect_to_database(
-        user=config['user'],
-        password=config['password'],
-        host=config['host'],
-        database=config['database']
-    )
+            elif args.fetch == "RELICSRUN":
+                items, item_ids, item_info, translation_dict = \
+                    await RelicsRunAPI.fetch_item_data_from_relics_run(cache=cache,
+                                                                       session=session)
+
+                date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
+                                                                  session=session)
+
+                await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
+                                                                    session=session,
+                                                                    item_ids=item_ids,
+                                                                    date_list=date_list,
+                                                                    platform=args.platform)
+
+    market_db = None
+    if args.build or args.database is not None:
+        # Connects to the database
+        market_db = MarketDatabase(user=config['user'],
+                                   password=config['password'],
+                                   host=config['host'],
+                                   database=config['database'])
 
     # Builds the database if specified
     if args.build:
@@ -38,33 +61,36 @@ async def main(args, config):
 
         for sql in sql.split(";"):
             if sql.strip() != "":
-                connection.cursor().execute(sql)
+                market_db.execute_query(sql)
 
     # Saves data to the database if specified
     if args.database is not None:
-        MarketDB.save_items(connection, items, item_ids, item_info)
-        MarketDB.save_items_in_set(connection, item_info)
-        MarketDB.save_item_tags(connection, item_info)
-        MarketDB.save_item_subtypes(connection, item_info)
-        MarketDB.build_and_save_category_info(connection, manifest_dict)
+        market_db.save_items(items, item_ids, item_info)
+        market_db.save_items_in_set(item_info)
+        market_db.save_item_tags(item_info)
+        market_db.save_item_subtypes(item_info)
+
+        wf_parser = await ManifestParser.build_parser(manifest_dict)
+        item_categories = ManifestParser.get_wfm_item_categorized(item_ids, manifest_dict, wf_parser)
+
+        market_db.save_item_categories(item_categories)
 
         # Set to either the most recent date in the database or set to None if args.database == "ALL"
-        last_save_date = MarketDB.get_last_saved_date(connection, args.database)
+        last_save_date = None
+        if args.database == "NEW":
+            last_save_date = market_db.get_most_recent_statistic_date(platform=args.platform)
 
-        MarketDB.insert_item_statistics(connection, last_save_date)
-
-        # Commits all changes to the database
-        MarketDB.commit_data(connection)
+        market_db.insert_item_statistics(last_save_date, platform=args.platform)
 
 
 def parse_handler():
     parser = argparse.ArgumentParser(description="Fetch and process Warframe Market price history.")
     parser.add_argument("-l", "--log-level", choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
                         help="Set the log level.")
-    parser.add_argument("-f", "--fetch", choices=["PREMADE", "NEW"],
+    parser.add_argument("-f", "--fetch", choices=["MARKET", "RELICSRUN"],
                         help="Fetch and process price history from the API."
-                             "\nPREMADE: Fetch premade data from relics.run."
-                             "\nNEW: Fetch data directly from warframe.market.")
+                             "\nRELICSRUN: Fetch cached data from relics.run."
+                             "\nMARKET: Fetch data directly from warframe.market.")
     parser.add_argument("-d", "--database", choices=["ALL", "NEW"],
                         help="Save all price history to the database.\n"
                              "ALL: Save all price history to the database.\n"
@@ -73,6 +99,9 @@ def parse_handler():
                         help="Build the database.")
     parser.add_argument("-c", "--clear", action="store_true",
                         help="Clears the cache.")
+    parser.add_argument("-p", "--platform", choices=["pc", "ps4", "xbox", "switch"],
+                        help="Set the platform to fetch data from.",
+                        default="pc")
 
     args = parser.parse_args()
 
@@ -84,7 +113,7 @@ def parse_handler():
         return
 
     if args.log_level:
-        common.logger.setLevel(args.log_level)
+        Common.logger.setLevel(args.log_level)
 
     asyncio.run(main(args, config))
 
