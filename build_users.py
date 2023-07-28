@@ -1,11 +1,11 @@
 import asyncio
 
-from market_engine.modules import MarketData
+from market_engine.Models.MarketDatabase import MarketDatabase
 
 
 # Used to build user table in database for use in MarketUser class allowing for non case-sensitive usernames
 async def main():
-    market_db = MarketData.MarketDatabase(
+    market_db = MarketDatabase(
         user='market',
         password='38NwWvkvZXiWV3',
         host='localhost',

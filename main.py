@@ -11,74 +11,81 @@ from market_engine.Models.MarketDatabase import MarketDatabase
 
 
 async def main(args, config):
-    async with session_manager() as session, cache_manager() as cache:
-        if args.clear:
-            logger.info("Clearing cache.")
-            cache.flushall()
+    if args.platform == "all":
+        args.platform = ["pc", "ps4", "xbox", "switch"]
+    else:
+        args.platform = [args.platform]
 
-        # Stores data from the API, whether fetched or prefetched from relics.run
-        items, item_ids, item_info, manifest_dict = None, None, None, None
-        if args.fetch is not None:
-            manifest_dict = await get_manifest(cache=cache, session=session)
-            items = await MarketAPI.fetch_items_from_warframe_market(cache=cache,
-                                                                     session=session)
-            item_ids = MarketAPI.build_item_ids(items)
-            if args.fetch == "MARKET":
-                statistic_history_dict, item_info = \
-                    await MarketAPI.fetch_statistics_from_warframe_market(cache=cache,
-                                                                          session=session,
-                                                                          platform=args.platform,
-                                                                          items=items,
-                                                                          item_ids=item_ids)
-                MarketAPI.save_statistic_history(statistic_history_dict, platform=args.platform)
+    for platform in args.platform:
+        logger.info(f"Fetching data for {platform}.")
+        async with session_manager() as session, cache_manager() as cache:
+            if args.clear:
+                logger.info("Clearing cache.")
+                cache.flushall()
 
-                MarketAPI.save_item_data(items, item_ids, item_info)
-            elif args.fetch == "RELICSRUN":
-                date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
-                                                                  session=session,
-                                                                  platform=args.platform)
+            # Stores data from the API, whether fetched or prefetched from relics.run
+            items, item_ids, item_info, manifest_dict = None, None, None, None
+            if args.fetch is not None:
+                manifest_dict = await get_manifest(cache=cache, session=session)
+                items = await MarketAPI.fetch_items_from_warframe_market(cache=cache,
+                                                                         session=session)
+                item_ids = MarketAPI.build_item_ids(items)
+                if args.fetch == "MARKET":
+                    statistic_history_dict, item_info = \
+                        await MarketAPI.fetch_statistics_from_warframe_market(cache=cache,
+                                                                              session=session,
+                                                                              platform=platform,
+                                                                              items=items,
+                                                                              item_ids=item_ids)
+                    MarketAPI.save_statistic_history(statistic_history_dict, platform=platform)
 
-                await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
-                                                                    session=session,
-                                                                    item_ids=item_ids,
-                                                                    date_list=date_list,
-                                                                    platform=args.platform)
+                    MarketAPI.save_item_data(items, item_ids, item_info)
+                elif args.fetch == "RELICSRUN":
+                    date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
+                                                                      session=session,
+                                                                      platform=platform)
 
-    market_db = None
-    if args.build or args.database is not None:
-        # Connects to the database
-        market_db = MarketDatabase(user=config['user'],
-                                   password=config['password'],
-                                   host=config['host'],
-                                   database=config['database'])
+                    await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
+                                                                        session=session,
+                                                                        item_ids=item_ids,
+                                                                        date_list=date_list,
+                                                                        platform=platform)
 
-    # Builds the database if specified
-    if args.build:
-        with open("build.sql", "r") as f:
-            sql = f.read()
+        market_db = None
+        if args.build or args.database is not None:
+            # Connects to the database
+            market_db = MarketDatabase(user=config['user'],
+                                       password=config['password'],
+                                       host=config['host'],
+                                       database=config['database'])
 
-        for sql in sql.split(";"):
-            if sql.strip() != "":
-                market_db.execute_query(sql)
+        # Builds the database if specified
+        if args.build:
+            with open("build.sql", "r") as f:
+                sql = f.read()
 
-    # Saves data to the database if specified
-    if args.database is not None:
-        market_db.save_items(items, item_ids, item_info)
-        market_db.save_items_in_set(item_info)
-        market_db.save_item_tags(item_info)
-        market_db.save_item_subtypes(item_info)
+            for sql in sql.split(";"):
+                if sql.strip() != "":
+                    market_db.execute_query(sql)
 
-        wf_parser = await ManifestParser.build_parser(manifest_dict)
-        item_categories = ManifestParser.get_wfm_item_categorized(item_ids, manifest_dict, wf_parser)
+        # Saves data to the database if specified
+        if args.database is not None:
+            market_db.save_items(items, item_ids, item_info)
+            market_db.save_items_in_set(item_info)
+            market_db.save_item_tags(item_info)
+            market_db.save_item_subtypes(item_info)
 
-        market_db.save_item_categories(item_categories)
+            wf_parser = await ManifestParser.build_parser(manifest_dict)
+            item_categories = ManifestParser.get_wfm_item_categorized(item_ids, manifest_dict, wf_parser)
 
-        # Set to either the most recent date in the database or set to None if args.database == "ALL"
-        last_save_date = None
-        if args.database == "NEW":
-            last_save_date = market_db.get_most_recent_statistic_date(platform=args.platform)
+            market_db.save_item_categories(item_categories)
 
-        market_db.insert_item_statistics(last_save_date, platform=args.platform)
+            # Set to either the most recent date in the database or set to None if args.database == "ALL"
+            last_save_date = None
+            if args.database == "NEW":
+                last_save_date = market_db.get_most_recent_statistic_date(platform=platform)
+
+            market_db.insert_item_statistics(last_save_date, platform=platform)
 
 
 def parse_handler():
@@ -97,7 +104,7 @@ def parse_handler():
                         help="Build the database.")
     parser.add_argument("-c", "--clear", action="store_true",
                         help="Clears the cache.")
-    parser.add_argument("-p", "--platform", choices=["pc", "ps4", "xbox", "switch"],
+    parser.add_argument("-p", "--platform", choices=["pc", "ps4", "xbox", "switch", "all"],
                         help="Set the platform to fetch data from.",
                         default="pc")
 
