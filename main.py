@@ -20,10 +20,10 @@ async def main(args, config):
         items, item_ids, item_info, manifest_dict = None, None, None, None
         if args.fetch is not None:
             manifest_dict = await get_manifest(cache=cache, session=session)
+            items = await MarketAPI.fetch_items_from_warframe_market(cache=cache,
+                                                                     session=session)
+            item_ids = MarketAPI.build_item_ids(items)
             if args.fetch == "MARKET":
-                items = await MarketAPI.fetch_items_from_warframe_market(cache=cache,
-                                                                         session=session)
-                item_ids = MarketAPI.build_item_ids(items)
                 statistic_history_dict, item_info = \
                     await MarketAPI.fetch_statistics_from_warframe_market(cache=cache,
                                                                           session=session,
@@ -32,13 +32,11 @@ async def main(args, config):
                                                                           item_ids=item_ids)
                 MarketAPI.save_statistic_history(statistic_history_dict, platform=args.platform)
 
+                MarketAPI.save_item_data(items, item_ids, item_info)
             elif args.fetch == "RELICSRUN":
-                items, item_ids, item_info, translation_dict = \
-                    await RelicsRunAPI.fetch_item_data_from_relics_run(cache=cache,
-                                                                       session=session)
-
                 date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
-                                                                  session=session)
+                                                                  session=session,
+                                                                  platform=args.platform)
 
                 await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
                                                                     session=session,
