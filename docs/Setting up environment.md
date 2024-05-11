@@ -87,6 +87,6 @@ exit
 
 After this, environment will be set up. If you run main.py with the ```-b``` parameter, it will set up the tables.
 
-If you wish to populate the database with statistic data, run main.py with the ```-f PREMADE -d NEW``` parameters.
+If you wish to populate the database with statistic data, run main.py with the ```-f RELICSRUN -d NEW``` parameters.
 
 
