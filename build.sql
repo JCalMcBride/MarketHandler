@@ -68,6 +68,8 @@ CREATE TABLE item_statistics
     mod_rank     INT                            DEFAULT NULL,
     donch_bot    DECIMAL(10, 2)                 DEFAULT NULL,
     donch_top    DECIMAL(10, 2)                 DEFAULT NULL,
+    amber_stars  INT                            DEFAULT NULL,
+    cyan_stars   INT                            DEFAULT NULL,
     FOREIGN KEY (item_id) REFERENCES items (id)
 );
 

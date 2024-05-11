@@ -3,11 +3,13 @@ import asyncio
 import json
 import os
 
+import pymysql
 from market_engine import Common, ManifestParser
 from market_engine.API import MarketAPI, RelicsRunAPI
 from market_engine.API.ManifestAPI import get_manifest
 from market_engine.Common import session_manager, cache_manager, logger
 from market_engine.Models.MarketDatabase import MarketDatabase
+from pymysql import OperationalError
 
 
 async def main(args, config):
@@ -54,10 +56,22 @@ async def main(args, config):
         market_db = None
         if args.build or args.database is not None:
             # Connects to the database
-            market_db = MarketDatabase(user=config['user'],
-                                       password=config['password'],
-                                       host=config['host'],
-                                       database=config['database'])
+            try:
+                market_db = MarketDatabase(user=config['user'],
+                                           password=config['password'],
+                                           host=config['host'],
+                                           database=config['database'])
+            except OperationalError:
+                with pymysql.connect(user=config['user'],
+                                        password=config['password'],
+                                        host=config['host']) as connection:
+                        with connection.cursor() as cursor:
+                            cursor.execute(f"create database if not exists market;")
+
+                market_db = MarketDatabase(user=config['user'],
+                                           password=config['password'],
+                                           host=config['host'],
+                                           database=config['database'])
 
         # Builds the database if specified
         if args.build:
