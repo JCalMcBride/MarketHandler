@@ -43,15 +43,24 @@ async def main(args, config):
 
                     MarketAPI.save_item_data(items, item_ids, item_info)
                 elif args.fetch == "RELICSRUN":
-                    date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
-                                                                      session=session,
-                                                                      platform=platform)
+                    fetch = True
+                    while fetch:
+                        date_list = await RelicsRunAPI.get_dates_to_fetch(cache=cache,
+                                                                          session=session,
+                                                                          platform=platform)
 
-                    await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
-                                                                        session=session,
-                                                                        item_ids=item_ids,
-                                                                        date_list=date_list,
-                                                                        platform=platform)
+                        if len(date_list) == 0:
+                            fetch = False
+                            continue
+
+                        await RelicsRunAPI.fetch_statistics_from_relics_run(cache=cache,
+                                                                            session=session,
+                                                                            item_ids=item_ids,
+                                                                            date_list=date_list,
+                                                                            platform=platform)
+
+                    items, item_ids, item_info, _ = await RelicsRunAPI.fetch_item_data_from_relics_run(cache=cache,
+                                                                                                       session=session)
 
         market_db = None
         if args.build or args.database is not None:
@@ -63,10 +72,10 @@ async def main(args, config):
                                            database=config['database'])
             except OperationalError:
                 with pymysql.connect(user=config['user'],
-                                        password=config['password'],
-                                        host=config['host']) as connection:
-                        with connection.cursor() as cursor:
-                            cursor.execute(f"create database if not exists market;")
+                                     password=config['password'],
+                                     host=config['host']) as connection:
+                    with connection.cursor() as cursor:
+                        cursor.execute(f"create database if not exists market;")
 
                 market_db = MarketDatabase(user=config['user'],
                                            password=config['password'],
