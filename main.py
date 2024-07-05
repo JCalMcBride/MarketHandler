@@ -91,13 +91,13 @@ async def main(args, config):
                 if sql.strip() != "":
                     market_db.execute_query(sql)
 
-        if args.database is not None or args.manfiest:
+        if args.database is not None or args.export:
             if manifest_dict is None:
                 manifest_dict = await get_manifest(cache=cache, session=session)
 
             wf_parser = await ManifestParser.build_parser(manifest_dict)
 
-            if args.manfiest:
+            if args.export:
                 os.makedirs(config['manifest_dir'], exist_ok=True)
 
                 for key in manifest_dict:
@@ -107,21 +107,38 @@ async def main(args, config):
                 with open(f"{config['manifest_dir']}/parser.json", "w") as f:
                     json.dump(wf_parser, f, indent=4)
 
-            if args.database is not None:
-                market_db.save_items(items, item_ids, item_info)
-                market_db.save_items_in_set(item_info)
-                market_db.save_item_tags(item_info)
-                market_db.save_item_subtypes(item_info)
-
+            if args.database is not None or args.marketdata:
                 item_categories = ManifestParser.get_wfm_item_categorized(item_ids, manifest_dict, wf_parser)
-                market_db.save_item_categories(item_categories)
 
-                # Set to either the most recent date in the database or set to None if args.database == "ALL"
-                last_save_date = None
-                if args.database == "NEW":
-                    last_save_date = market_db.get_most_recent_statistic_date(platform=platform)
+                if args.marketdata:
+                    os.makedirs(config['marketdata_dir'], exist_ok=True)
 
-                market_db.insert_item_statistics(last_save_date, platform=platform)
+                    with open(f"{config['marketdata_dir']}/items.json", "w") as f:
+                        json.dump(items, f, indent=4)
+
+                    with open(f"{config['marketdata_dir']}/item_ids.json", "w") as f:
+                        json.dump(item_ids, f, indent=4)
+
+                    with open(f"{config['marketdata_dir']}/item_info.json", "w") as f:
+                        json.dump(item_info, f, indent=4)
+
+                    with open(f"{config['marketdata_dir']}/item_categories.json", "w") as f:
+                        json.dump(item_categories, f, indent=4)
+
+                if args.database is not None:
+                    market_db.save_items(items, item_ids, item_info)
+                    market_db.save_items_in_set(item_info)
+                    market_db.save_item_tags(item_info)
+                    market_db.save_item_subtypes(item_info)
+
+                    market_db.save_item_categories(item_categories)
+
+                    # Set to either the most recent date in the database or set to None if args.database == "ALL"
+                    last_save_date = None
+                    if args.database == "NEW":
+                        last_save_date = market_db.get_most_recent_statistic_date(platform=platform)
+
+                    market_db.insert_item_statistics(last_save_date, platform=platform)
 
 
 def parse_handler():
@@ -143,8 +160,10 @@ def parse_handler():
     parser.add_argument("-p", "--platform", choices=["pc", "ps4", "xbox", "switch", "all"],
                         help="Set the platform to fetch data from.",
                         default="pc")
-    parser.add_argument("-m", "--manfiest", action="store_true",
-                        help="Whether to save the manifest related files.")
+    parser.add_argument("-e", "--export", action="store_true",
+                        help="Whether to save the mobile export related files.")
+    parser.add_argument("-m", "--marketdata", action="store_true",
+                        help="Whether to save the market data related files.")
 
     args = parser.parse_args()
 
