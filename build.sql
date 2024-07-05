@@ -8,8 +8,6 @@ drop table if exists items_in_set;
 drop table if exists item_tags;
 drop table if exists item_aliases;
 drop table if exists word_aliases;
-drop table if exists username_history;
-drop table if exists market_users;
 drop table if exists items;
 
 
@@ -86,19 +84,6 @@ CREATE TABLE word_aliases (
     PRIMARY KEY (word, alias)
 );
 
-CREATE TABLE market_users (
-    user_id VARCHAR(255),
-    ingame_name VARCHAR(255),
-    PRIMARY KEY (user_id)
-);
-
-CREATE TABLE username_history (
-    user_id VARCHAR(255),
-    ingame_name VARCHAR(255),
-    datetime TIMESTAMP,
-    PRIMARY KEY (user_id, ingame_name),
-    FOREIGN KEY (user_id) REFERENCES market_users (user_id)
-);
 
 CREATE INDEX idx_item_statistics_optimized
 ON item_statistics (item_id, datetime, order_type, platform);
