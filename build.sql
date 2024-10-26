@@ -84,6 +84,18 @@ CREATE TABLE word_aliases (
     PRIMARY KEY (word, alias)
 );
 
+CREATE TABLE market_users (
+  user_id VARCHAR(255) NOT NULL,
+  ingame_name VARCHAR(255),
+  PRIMARY KEY (user_id)
+);
+
+CREATE TABLE username_history (
+  user_id VARCHAR(255) NOT NULL,
+  ingame_name VARCHAR(255) NOT NULL,
+  datetime TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (user_id, ingame_name)
+);
 
 CREATE INDEX idx_item_statistics_optimized
 ON item_statistics (item_id, datetime, order_type, platform);

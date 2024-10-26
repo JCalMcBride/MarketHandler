@@ -2,6 +2,8 @@ import argparse
 import asyncio
 import json
 import os
+import re
+from collections import defaultdict
 
 import pymysql
 from market_engine import Common, ManifestParser
@@ -10,6 +12,50 @@ from market_engine.API.ManifestAPI import get_manifest
 from market_engine.Common import session_manager, cache_manager, logger
 from market_engine.Models.MarketDatabase import MarketDatabase
 from pymysql import OperationalError
+
+
+def group_relics(data):
+    # List of possible refinements
+    refinements = ["Bronze", "Silver", "Gold", "Platinum"]
+
+    # Initialize a dictionary to store relics by base group name
+    grouped_relics = defaultdict(list)
+
+    # Process each item in the JSON data
+    for item in data["ExportRelicArcane"]:
+        unique_name = item["uniqueName"]
+
+        # Ensure the name starts with the correct prefix
+        prefix = "/Lotus/Types/Game/Projections/"
+        if unique_name.startswith(prefix):
+
+            # Remove the prefix
+            relic_name = unique_name[len(prefix):]
+
+            # Remove the tier and 'VoidProjection'
+            relic_name = re.sub(r'^T[1-5]VoidProjection', '', relic_name)
+
+            # Remove the refinement suffix if present
+            for refinement in refinements:
+                if relic_name.endswith(refinement):
+                    relic_name = relic_name[:-len(refinement)]
+                    break  # Stop after removing the refinement
+
+            # Remove the variant letter at the end if present (e.g., 'A', 'B', etc.)
+            if relic_name and relic_name[-1].isupper():
+                relic_name = relic_name[:-1]
+
+            # The remaining string is the base group name
+            group_name = relic_name
+
+            if group_name == "":
+                group_name = "Unknown"
+
+            # Add the unique name to the list under the base group name
+            if item['name'] not in grouped_relics[group_name]:
+                grouped_relics[group_name].append(item['name'])
+
+    return dict(grouped_relics)
 
 
 async def main(args, config):
@@ -106,6 +152,11 @@ async def main(args, config):
 
                 with open(f"{config['manifest_dir']}/parser.json", "w") as f:
                     json.dump(wf_parser, f, indent=4)
+
+                grouped_relics = group_relics(manifest_dict['ExportRelicArcane'])
+
+                with open(f"{config['manifest_dir']}/GroupedRelics.json", "w") as f:
+                    json.dump(grouped_relics, f, indent=4)
 
             if args.database is not None or args.marketdata:
                 item_categories = ManifestParser.get_wfm_item_categorized(item_ids, manifest_dict, wf_parser)
